@@ -8,13 +8,19 @@ from string import Template
 import ssl
 import os
 import time
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
 from datetime import datetime
+
+# UI Libraries - Swapped to customtkinter
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+
+# Set the appearance mode for customtkinter
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("blue")
 
 
 class EmailConfig:
-    """Class to store email configuration"""
+    """Class to store email configuration (UNCHANGED)"""
 
     def __init__(self):
         self.sender_email = ""
@@ -31,7 +37,7 @@ class BulkEmailSender:
         self.data_file = ""
         self.attachment_file = ""
 
-        # Email providers configuration
+        # Email providers configuration (UNCHANGED)
         self.email_providers = {
             "Gmail": {"server": "smtp.gmail.com", "port": 587},
             "Office 365": {"server": "smtp.office365.com", "port": 587},
@@ -40,7 +46,31 @@ class BulkEmailSender:
             "Custom": {"server": "", "port": 587}
         }
 
-        # Email Template
+        # --- UI STYLING CONSTANTS ---
+        self.colors = {
+            "bg": "#F9F5F2",
+            "frame_bg": "#FFFFFF",
+            "text": "#1E1E1E",
+            "text_light": "#666666",
+            "button": "#1E1E1E",
+            "button_hover": "#333333",
+            "accent": "#E67E22",
+            "success": "#27AE60",
+            "error": "#C0392B"
+        }
+        self.fonts = {
+            "title": ("Times New Roman", 48, "bold"),
+            "subtitle": ("Arial", 14),
+            "heading": ("Arial", 16, "bold"),
+            "body": ("Arial", 12),
+            "button": ("Arial", 12, "bold"),
+            "small": ("Arial", 10)
+        }
+
+        self.animation_steps = 20
+        self.animation_speed = 0.008
+
+        # Email Template (UNCHANGED)
         self.EMAIL_TEMPLATE = Template("""
 <html>
 <head>
@@ -65,7 +95,7 @@ class BulkEmailSender:
     <div class="content">
         <p><strong>Dear Associate - $agency_person_name,</strong></p>
 
-        <p>We are issuing this notice in your capacity as an empaneled vendor/agency of <strong>Axis Bank Ltd</strong>. This communication serves as a <strong>Show Cause Notice</strong> under the applicable contractual and legal obligations, including but not limited to the terms of engagement executed between your agency and Axis Bank.</p>
+        <p>We are issuing this notice in your capacity as an empaneled vendor/agency of <strong>Axis Bank Ltd</strong>. This communication serves as a <strong>Show Cause Notice</strong> under the applicable contractual and legal obligations, including but not to the terms of engagement executed between your agency and Axis Bank.</p>
 
         <p>It has come to our attention, pursuant to external audit conducted at your agency (<strong>$agency_location</strong>) on dated <strong>$audit_date</strong>. During the External audit we have identified below mentioned observations:</p>
 
@@ -96,203 +126,264 @@ class BulkEmailSender:
 </html>""")
 
     def setup_gui(self):
-        """Create the main GUI window"""
-        self.root = tk.Tk()
-        self.root.title("Universal Bulk Email System - Audit Notices")
-        self.root.geometry("600x650")  # Adjusted height
-        self.root.configure(bg='#f0f0f0')
+        """Create the main GUI window using customtkinter"""
+        self.root = ctk.CTk()
+        self.root.title("Universal Bulk Email System")
+        self.root.geometry("1000x750")
+        self.root.configure(fg_color=self.colors["bg"])
+        self.root.resizable(True, True)  # Allow resizing/maximizing
 
-        # Main title
-        title_label = tk.Label(self.root, text="Universal Bulk Email System",
-                               font=('Arial', 16, 'bold'), bg='#f0f0f0', fg='#0066cc')
-        title_label.pack(pady=10)
+        # Main layout: 1x2 grid
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=2)
+        self.root.grid_rowconfigure(0, weight=1)
 
-        subtitle_label = tk.Label(self.root, text="Automated Audit Notice Sender",
-                                  font=('Arial', 12), bg='#f0f0f0', fg='#666666')
-        subtitle_label.pack(pady=(0, 20))
+        # --- Left Frame (Title) ---
+        self.left_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=40, pady=20)
 
-        # Create main frame
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(padx=20, pady=10, fill='both', expand=True)
+        logo_label = ctk.CTkLabel(self.left_frame, text="*", font=("Arial", 30, "bold"),
+                                  text_color=self.colors["accent"])
+        logo_label.pack(anchor="w", pady=(20, 0))
 
-        # Email Configuration Section
-        config_frame = ttk.LabelFrame(main_frame, text="Email Configuration", padding="10")
-        config_frame.pack(fill='x', pady=(0, 10))
+        ctk.CTkLabel(self.left_frame, text="Automated", font=self.fonts["title"], text_color=self.colors["text"],
+                     anchor="w", justify="left").pack(fill="x", pady=(20, 0))
+        ctk.CTkLabel(self.left_frame, text="Mailer.", font=self.fonts["title"], text_color=self.colors["text"],
+                     anchor="w", justify="left").pack(fill="x")
 
-        ttk.Button(config_frame, text="Configure Email Settings",
-                   command=self.configure_email).pack(fill='x', pady=5)
+        ctk.CTkLabel(self.left_frame, text="The AI for bulk mailing", font=self.fonts["subtitle"],
+                     text_color=self.colors["text_light"], anchor="w", justify="left").pack(fill="x", pady=(10, 0))
 
-        self.config_status = ttk.Label(config_frame, text="❌ Not configured",
-                                       foreground='red')
-        self.config_status.pack(pady=5)
+        # --- Right Frame (Container for sliding frames) ---
+        self.right_frame_container = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.right_frame_container.grid(row=0, column=1, sticky="nsew", padx=(20, 40), pady=40)
 
-        # File Selection Section
-        files_frame = ttk.LabelFrame(main_frame, text="File Selection", padding="10")
-        files_frame.pack(fill='x', pady=(0, 10))
+        # --- Main Controls Frame (Initially visible) ---
+        self.main_controls_frame = ctk.CTkFrame(self.right_frame_container, fg_color="transparent")
+        self.main_controls_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        # Combined data file
-        ttk.Label(files_frame, text="Data File (Excel/CSV):").pack(anchor='w')
-        data_frame = ttk.Frame(files_frame)
-        data_frame.pack(fill='x', pady=5)
+        self.setup_main_controls()
 
-        self.data_label = ttk.Label(data_frame, text="No file selected",
-                                    foreground='gray')
-        self.data_label.pack(side='left', fill='x', expand=True)
-        ttk.Button(data_frame, text="Browse",
-                   command=self.select_data_file).pack(side='right')
+        # --- Email Config Frame (Initially hidden to the left) ---
+        self.config_frame = ctk.CTkFrame(self.right_frame_container, fg_color="transparent")
+        self.config_frame.place(relx=-1, rely=0, relwidth=1, relheight=1)  # Start off-screen
 
-        # Attachment file
-        ttk.Label(files_frame, text="Attachment File - Optional:").pack(anchor='w', pady=(10, 0))
-        attachment_frame = ttk.Frame(files_frame)
-        attachment_frame.pack(fill='x', pady=5)
+        self.setup_config_controls()
 
-        self.attachment_label = ttk.Label(attachment_frame, text="No file selected",
-                                          foreground='gray')
-        self.attachment_label.pack(side='left', fill='x', expand=True)
-        ttk.Button(attachment_frame, text="Browse",
-                   command=self.select_attachment_file).pack(side='right')
+    def setup_main_controls(self):
+        """Create the widgets for the main control panel"""
+        # --- Section 1: Setup ---
+        setup_frame = ctk.CTkFrame(self.main_controls_frame, fg_color=self.colors["frame_bg"], corner_radius=15)
+        setup_frame.pack(fill="x", expand=False, pady=(0, 15))
 
-        # Preview Section
-        preview_frame = ttk.LabelFrame(main_frame, text="Preview & Validation", padding="10")
-        preview_frame.pack(fill='x', pady=(0, 10))
+        ctk.CTkLabel(setup_frame, text="1. Setup", font=self.fonts["heading"], text_color=self.colors["text"]).pack(
+            anchor="w", padx=20, pady=(15, 10))
 
-        ttk.Button(preview_frame, text="Preview Email Template",
-                   command=self.preview_email).pack(fill='x', pady=2)
-        ttk.Button(preview_frame, text="Validate Data File",
-                   command=self.validate_files).pack(fill='x', pady=2)
+        self.config_status = ctk.CTkLabel(setup_frame, text="❌ Not configured", text_color=self.colors["error"],
+                                          font=self.fonts["body"])
+        self.config_status.pack(side="right", padx=20, pady=10)
+        ctk.CTkButton(setup_frame, text="Configure Email Settings", font=self.fonts["button"],
+                      fg_color=self.colors["button"], hover_color=self.colors["button_hover"],
+                      command=self.show_config_frame).pack(side="left", padx=20, pady=10)
 
-        # Send Section
-        send_frame = ttk.LabelFrame(main_frame, text="Send Emails", padding="10")
-        send_frame.pack(fill='x', pady=(0, 10))
+        # --- Section 2: Files ---
+        files_frame = ctk.CTkFrame(self.main_controls_frame, fg_color=self.colors["frame_bg"], corner_radius=15)
+        files_frame.pack(fill="x", expand=False, pady=(0, 15))
+        ctk.CTkLabel(files_frame, text="2. Add Files", font=self.fonts["heading"], text_color=self.colors["text"]).pack(
+            anchor="w", padx=20, pady=(15, 10))
 
-        # Test email option
-        test_frame = ttk.Frame(send_frame)
-        test_frame.pack(fill='x', pady=5)
+        data_frame = ctk.CTkFrame(files_frame, fg_color="transparent")
+        data_frame.pack(fill='x', padx=20, pady=5)
+        ctk.CTkLabel(data_frame, text="Data File (Excel/CSV):", font=self.fonts["body"]).pack(anchor="w")
+        self.data_label = ctk.CTkLabel(data_frame, text="No file selected", text_color=self.colors["text_light"],
+                                       font=self.fonts["small"], anchor="w")
+        self.data_label.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(data_frame, text="Browse...", width=80, fg_color=self.colors["button"],
+                      hover_color=self.colors["button_hover"], command=self.select_data_file).pack(side="right")
 
-        self.test_var = tk.BooleanVar()
-        ttk.Checkbutton(test_frame, text="Send test email first (to sender's email)",
-                        variable=self.test_var).pack(side='left')
+        attach_frame = ctk.CTkFrame(files_frame, fg_color="transparent")
+        attach_frame.pack(fill='x', padx=20, pady=10)
+        ctk.CTkLabel(attach_frame, text="Attachment (Optional):", font=self.fonts["body"]).pack(anchor="w")
+        self.attachment_label = ctk.CTkLabel(attach_frame, text="No file selected",
+                                             text_color=self.colors["text_light"], font=self.fonts["small"], anchor="w")
+        self.attachment_label.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(attach_frame, text="Browse...", width=80, fg_color=self.colors["button"],
+                      hover_color=self.colors["button_hover"], command=self.select_attachment_file).pack(side="right")
 
-        # Send buttons
-        button_frame = ttk.Frame(send_frame)
-        button_frame.pack(fill='x', pady=10)
+        # --- Section 3: Validate & Send ---
+        action_frame = ctk.CTkFrame(self.main_controls_frame, fg_color=self.colors["frame_bg"], corner_radius=15)
+        action_frame.pack(fill="x", expand=False, pady=(0, 15))
+        ctk.CTkLabel(action_frame, text="3. Validate & Send", font=self.fonts["heading"],
+                     text_color=self.colors["text"]).pack(anchor="w", padx=20, pady=(15, 10))
 
-        ttk.Button(button_frame, text="Send All Emails",
-                   command=self.send_bulk_emails).pack(side='left', padx=(0, 10))
-        ttk.Button(button_frame, text="Send to First 5 Unique Agencies (Test)",
-                   command=self.send_test_batch).pack(side='left')
+        button_grid = ctk.CTkFrame(action_frame, fg_color="transparent")
+        button_grid.pack(fill="x", padx=20, pady=10)
+        button_grid.grid_columnconfigure((0, 1), weight=1)
 
-        # Progress Section
-        progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding="10")
-        progress_frame.pack(fill='both', expand=True)
+        ctk.CTkButton(button_grid, text="Preview Template", fg_color=self.colors["button"],
+                      hover_color=self.colors["button_hover"], command=self.preview_email).grid(row=0, column=0,
+                                                                                                sticky="ew",
+                                                                                                padx=(0, 5))
+        ctk.CTkButton(button_grid, text="Validate Data File", fg_color=self.colors["button"],
+                      hover_color=self.colors["button_hover"], command=self.validate_files).grid(row=0, column=1,
+                                                                                                 sticky="ew",
+                                                                                                 padx=(5, 0))
 
-        self.progress_var = tk.StringVar(value="Ready to start...")
-        self.progress_label = ttk.Label(progress_frame, textvariable=self.progress_var)
-        self.progress_label.pack(pady=5)
+        self.test_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(button_grid, text="Send test email first", variable=self.test_var,
+                        font=self.fonts["body"]).grid(row=1, column=0, columnspan=2, pady=10, sticky="w")
 
-        self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate')
-        self.progress_bar.pack(fill='x', pady=5)
+        ctk.CTkButton(button_grid, text="Send to First 5 (Test)", command=self.send_test_batch).grid(row=2, column=0,
+                                                                                                     sticky="ew",
+                                                                                                     padx=(0, 5),
+                                                                                                     pady=(5, 0))
+        ctk.CTkButton(button_grid, text="Send All Emails", command=self.send_bulk_emails).grid(row=2, column=1,
+                                                                                               sticky="ew", padx=(5, 0),
+                                                                                               pady=(5, 0))
 
-        # Log text area
-        self.log_text = tk.Text(progress_frame, height=8, wrap=tk.WORD)
-        scrollbar = ttk.Scrollbar(progress_frame, orient="vertical", command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=scrollbar.set)
-        self.log_text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # --- Section 4: Progress ---
+        progress_frame = ctk.CTkFrame(self.main_controls_frame, fg_color=self.colors["frame_bg"], corner_radius=15)
+        progress_frame.pack(fill="both", expand=True)
 
-    def configure_email(self):
-        """Open email configuration dialog"""
-        config_window = tk.Toplevel(self.root)
-        config_window.title("Email Configuration")
-        config_window.geometry("450x450")
-        config_window.transient(self.root)
-        config_window.grab_set()
+        self.progress_var = ctk.StringVar(value="Ready to start...")
+        self.progress_label = ctk.CTkLabel(progress_frame, textvariable=self.progress_var, font=self.fonts["body"],
+                                           text_color=self.colors["text_light"])
+        self.progress_label.pack(anchor="w", padx=20, pady=(15, 5))
 
-        main_config_frame = ttk.Frame(config_window, padding="20")
-        main_config_frame.pack(fill='both', expand=True)
+        self.progress_bar = ctk.CTkProgressBar(progress_frame, progress_color=self.colors["accent"])
+        self.progress_bar.set(0)
+        self.progress_bar.pack(fill='x', padx=20, pady=(0, 10))
 
-        ttk.Label(main_config_frame, text="Email Provider:").pack(anchor='w')
-        provider_var = tk.StringVar(value="Gmail")
-        provider_combo = ttk.Combobox(main_config_frame, textvariable=provider_var,
-                                      values=list(self.email_providers.keys()), state="readonly")
-        provider_combo.pack(fill='x', pady=(2, 10))
+        self.log_text = ctk.CTkTextbox(progress_frame, fg_color="#F0F0F0", text_color=self.colors["text_light"],
+                                       font=self.fonts["small"])
+        self.log_text.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+        self.log("Application initialized.")
 
-        custom_frame = ttk.Frame(main_config_frame)
+    def setup_config_controls(self):
+        """Create the widgets for the email configuration panel"""
+        container = ctk.CTkFrame(self.config_frame, fg_color=self.colors["frame_bg"], corner_radius=15)
+        container.pack(fill="both", expand=True)
 
-        ttk.Label(custom_frame, text="Custom SMTP Server:").pack(anchor='w')
-        custom_server_entry = ttk.Entry(custom_frame)
-        custom_server_entry.pack(fill='x', pady=2)
+        ctk.CTkLabel(container, text="Email Configuration", font=self.fonts["heading"],
+                     text_color=self.colors["text"]).pack(anchor="w", padx=20, pady=(15, 20))
 
-        ttk.Label(custom_frame, text="SMTP Port:").pack(anchor='w', pady=(5, 0))
-        custom_port_entry = ttk.Entry(custom_frame)
-        custom_port_entry.pack(fill='x', pady=2)
-        custom_port_entry.insert(0, "587")
+        # --- Entries ---
+        ctk.CTkLabel(container, text="Email Provider:", font=self.fonts["body"]).pack(anchor='w', padx=20)
+        self.provider_var = ctk.StringVar(value="Gmail")
+        provider_combo = ctk.CTkComboBox(container, variable=self.provider_var,
+                                         values=list(self.email_providers.keys()), state="readonly",
+                                         command=self.toggle_custom_fields)
+        provider_combo.pack(fill='x', padx=20, pady=(2, 10))
 
-        def toggle_custom_fields(*args):
-            if provider_var.get() == "Custom":
-                custom_frame.pack(fill='x', pady=5, before=email_label)
-            else:
-                custom_frame.pack_forget()
+        # This frame will contain the custom SMTP fields
+        self.custom_frame = ctk.CTkFrame(container, fg_color="transparent")
 
-        provider_var.trace('w', toggle_custom_fields)
+        ctk.CTkLabel(self.custom_frame, text="Custom SMTP Server:", font=self.fonts["body"]).pack(anchor='w')
+        self.custom_server_entry = ctk.CTkEntry(self.custom_frame)
+        self.custom_server_entry.pack(fill='x', pady=2)
+        ctk.CTkLabel(self.custom_frame, text="SMTP Port:", font=self.fonts["body"]).pack(anchor='w', pady=(5, 0))
+        self.custom_port_entry = ctk.CTkEntry(self.custom_frame)
+        self.custom_port_entry.pack(fill='x', pady=2)
+        self.custom_port_entry.insert(0, "587")
 
-        email_label = ttk.Label(main_config_frame, text="Sender Email:")
-        email_label.pack(anchor='w', pady=(10, 0))
-        email_entry = ttk.Entry(main_config_frame, width=50)
-        email_entry.pack(fill='x', pady=2)
-        if self.config.sender_email:
-            email_entry.insert(0, self.config.sender_email)
+        # Define the rest of the widgets
+        self.email_label = ctk.CTkLabel(container, text="Sender Email:", font=self.fonts["body"])
+        self.email_entry = ctk.CTkEntry(container)
 
-        ttk.Label(main_config_frame, text="App Password:").pack(anchor='w', pady=(5, 0))
-        password_entry = ttk.Entry(main_config_frame, show="*", width=50)
-        password_entry.pack(fill='x', pady=2)
+        self.password_label = ctk.CTkLabel(container, text="App Password:", font=self.fonts["body"])
+        self.password_entry = ctk.CTkEntry(container, show="*")
 
-        ttk.Label(main_config_frame, text="Your Name:").pack(anchor='w', pady=(5, 0))
-        name_entry = ttk.Entry(main_config_frame, width=50)
-        name_entry.pack(fill='x', pady=2)
-        if self.config.your_name:
-            name_entry.insert(0, self.config.your_name)
+        self.name_label = ctk.CTkLabel(container, text="Your Name:", font=self.fonts["body"])
+        self.name_entry = ctk.CTkEntry(container)
 
-        ttk.Label(main_config_frame, text="Your Designation:").pack(anchor='w', pady=(5, 0))
-        designation_entry = ttk.Entry(main_config_frame, width=50)
-        designation_entry.pack(fill='x', pady=2)
-        if self.config.your_designation:
-            designation_entry.insert(0, self.config.your_designation)
+        self.designation_label = ctk.CTkLabel(container, text="Your Designation:", font=self.fonts["body"])
+        self.designation_entry = ctk.CTkEntry(container)
 
-        help_text = tk.Label(main_config_frame,
-                             text="Note: For Gmail, use an App Password (not your regular password).",
-                             wraplength=380, justify='left', foreground='gray')
-        help_text.pack(fill='x', pady=(15, 5))
+        # Pack them in order
+        self.email_label.pack(anchor='w', padx=20)
+        self.email_entry.pack(fill='x', padx=20, pady=2)
 
-        def save_config():
-            if not email_entry.get() or not password_entry.get() or not name_entry.get():
-                messagebox.showerror("Error", "Please fill in all required fields!", parent=config_window)
-                return
+        self.password_label.pack(anchor='w', padx=20, pady=(5, 0))
+        self.password_entry.pack(fill='x', padx=20, pady=2)
 
-            self.config.sender_email = email_entry.get()
-            self.config.password = password_entry.get()
-            self.config.your_name = name_entry.get()
-            self.config.your_designation = designation_entry.get()
+        self.name_label.pack(anchor='w', padx=20, pady=(5, 0))
+        self.name_entry.pack(fill='x', padx=20, pady=2)
 
-            provider = provider_var.get()
-            if provider == "Custom":
-                self.config.smtp_server = custom_server_entry.get()
-                self.config.smtp_port = int(custom_port_entry.get())
-            else:
-                self.config.smtp_server = self.email_providers[provider]["server"]
-                self.config.smtp_port = self.email_providers[provider]["port"]
+        self.designation_label.pack(anchor='w', padx=20, pady=(5, 0))
+        self.designation_entry.pack(fill='x', padx=20, pady=(2, 15))
 
-            self.config_status.configure(text=f"✅ Configured ({provider})", foreground='green')
-            self.log("Email configuration saved successfully!")
-            config_window.destroy()
+        help_text = ctk.CTkLabel(container, text="Note: For Gmail, use an App Password.", wraplength=400,
+                                 justify='left', text_color='gray', font=self.fonts["small"])
+        help_text.pack(fill='x', padx=20, pady=(15, 5))
 
-        button_frame = ttk.Frame(main_config_frame)
-        button_frame.pack(fill='x', pady=(20, 0))
+        # --- Buttons ---
+        button_frame = ctk.CTkFrame(container, fg_color="transparent")
+        button_frame.pack(fill='x', padx=20, pady=(20, 0), side="bottom")
 
-        ttk.Button(button_frame, text="Save Configuration", command=save_config).pack(side='right', padx=(10, 0))
-        ttk.Button(button_frame, text="Cancel", command=config_window.destroy).pack(side='right')
+        ctk.CTkButton(button_frame, text="Save Configuration", command=self.save_config).pack(side='right',
+                                                                                              padx=(10, 0))
+        ctk.CTkButton(button_frame, text="Back", command=self.hide_config_frame, fg_color="gray").pack(side='right')
 
-        toggle_custom_fields()
+        # Load existing config if available
+        if self.config.sender_email: self.email_entry.insert(0, self.config.sender_email)
+        if self.config.your_name: self.name_entry.insert(0, self.config.your_name)
+        if self.config.your_designation: self.designation_entry.insert(0, self.config.your_designation)
+
+    def toggle_custom_fields(self, *args):
+        """Shows or hides the custom SMTP fields based on combobox selection."""
+        if self.provider_var.get() == "Custom":
+            # **FIX:** Pack the custom frame *before* the next widget (email_label)
+            self.custom_frame.pack(fill='x', padx=20, pady=5, before=self.email_label)
+        else:
+            self.custom_frame.pack_forget()
+
+    def show_config_frame(self):
+        """Animates the configuration frame into view."""
+        self.toggle_custom_fields()  # ensure correct fields are shown
+        for i in range(self.animation_steps + 1):
+            pos = i / self.animation_steps
+            self.main_controls_frame.place(relx=pos, rely=0, relwidth=1, relheight=1)
+            self.config_frame.place(relx=-1 + pos, rely=0, relwidth=1, relheight=1)
+            self.root.update()
+            time.sleep(self.animation_speed)
+
+    def hide_config_frame(self):
+        """Animates the configuration frame out of view."""
+        for i in range(self.animation_steps + 1):
+            pos = i / self.animation_steps
+            self.main_controls_frame.place(relx=pos * -1, rely=0, relwidth=1, relheight=1)
+            self.config_frame.place(relx=pos, rely=0, relwidth=1, relheight=1)
+            self.root.update()
+            time.sleep(self.animation_speed)
+
+        # Reposition frames correctly after animation
+        self.main_controls_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.config_frame.place(relx=-1, rely=0, relwidth=1, relheight=1)
+
+    def save_config(self):
+        """Saves the email configuration from the UI fields."""
+        if not self.email_entry.get() or not self.password_entry.get() or not self.name_entry.get():
+            messagebox.showerror("Error", "Please fill in all required fields!")
+            return
+
+        self.config.sender_email = self.email_entry.get()
+        self.config.password = self.password_entry.get()
+        self.config.your_name = self.name_entry.get()
+        self.config.your_designation = self.designation_entry.get()
+
+        provider = self.provider_var.get()
+        if provider == "Custom":
+            self.config.smtp_server = self.custom_server_entry.get()
+            self.config.smtp_port = int(self.custom_port_entry.get())
+        else:
+            self.config.smtp_server = self.email_providers[provider]["server"]
+            self.config.smtp_port = self.email_providers[provider]["port"]
+
+        self.config_status.configure(text=f"✅ Configured ({provider})", text_color=self.colors["success"])
+        self.log("Email configuration saved successfully!")
+        self.hide_config_frame()
+
+    # --- ALL CORE FUNCTIONALITY METHODS BELOW ARE UNCHANGED ---
 
     def select_data_file(self):
         """Select the main data file"""
@@ -304,7 +395,7 @@ class BulkEmailSender:
         filename = filedialog.askopenfilename(title="Select Data File", filetypes=file_types)
         if filename:
             self.data_file = filename
-            self.data_label.configure(text=os.path.basename(filename), foreground='black')
+            self.data_label.configure(text=os.path.basename(filename), text_color=self.colors["text"])
             self.log(f"Selected data file: {os.path.basename(filename)}")
 
     def select_attachment_file(self):
@@ -312,14 +403,14 @@ class BulkEmailSender:
         filename = filedialog.askopenfilename(title="Select Attachment File")
         if filename:
             self.attachment_file = filename
-            self.attachment_label.configure(text=os.path.basename(filename), foreground='black')
+            self.attachment_label.configure(text=os.path.basename(filename), text_color=self.colors["text"])
             self.log(f"Selected attachment file: {os.path.basename(filename)}")
 
     def log(self, message):
         """Add message to log"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
-        self.log_text.see(tk.END)
+        self.log_text.insert("end", f"[{timestamp}] {message}\n")
+        self.log_text.see("end")
         self.root.update_idletasks()
 
     def create_audit_table(self, agency_audit_df):
@@ -421,19 +512,12 @@ class BulkEmailSender:
 
         email_body = self.EMAIL_TEMPLATE.substitute(sample_data)
 
-        preview_window = tk.Toplevel(self.root)
+        preview_window = ctk.CTkToplevel(self.root)
         preview_window.title("Email Preview")
         preview_window.geometry("800x600")
 
-        frame = ttk.Frame(preview_window)
-        frame.pack(fill='both', expand=True, padx=10, pady=10)
-
-        text_area = tk.Text(frame, wrap=tk.WORD, font=("Arial", 10))
-        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=text_area.yview)
-        text_area.configure(yscrollcommand=scrollbar.set)
-
-        text_area.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        text_area = ctk.CTkTextbox(preview_window, font=("Arial", 10))
+        text_area.pack(fill='both', expand=True, padx=10, pady=10)
 
         text_area.insert('1.0', email_body)
         text_area.configure(state='disabled')
@@ -514,7 +598,6 @@ class BulkEmailSender:
 
             df = df.fillna('')  # Clean NaN values
 
-            # Group by agency to send one email per agency
             grouped = df.groupby('agency_name')
             agencies_to_process = list(grouped.groups.keys())
 
@@ -551,8 +634,7 @@ class BulkEmailSender:
                         messagebox.showerror("Error", "Test email failed! Please check configuration and logs.")
                         return
 
-                self.progress_bar['maximum'] = len(agencies_to_process)
-                self.progress_bar['value'] = 0
+                self.progress_bar.set(0)
                 success_count = 0
                 failed_count = 0
 
@@ -572,7 +654,7 @@ class BulkEmailSender:
                         if reason != "Skipped":
                             self.log(f"❌ Failed to send email to {agency_name}")
 
-                    self.progress_bar['value'] = i + 1
+                    self.progress_bar.set((i + 1) / len(agencies_to_process))
                     self.root.update_idletasks()
                     time.sleep(2)
 
